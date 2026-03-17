@@ -1,5 +1,9 @@
+import 'dart:io';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:shimmer/shimmer.dart';
 
 import '../../../core/providers/providers.dart';
@@ -26,6 +30,22 @@ class ForumCategory {
   }
 }
 
+class ForumMedia {
+  final String id;
+  final String url;
+  final String type;
+
+  const ForumMedia({required this.id, required this.url, required this.type});
+
+  factory ForumMedia.fromJson(Map<String, dynamic> json) {
+    return ForumMedia(
+      id: json['id'] as String,
+      url: json['url'] as String,
+      type: json['type'] as String? ?? 'image',
+    );
+  }
+}
+
 class ForumPost {
   final String id;
   final String title;
@@ -37,7 +57,8 @@ class ForumPost {
   final int downvotes;
   final int commentCount;
   final DateTime createdAt;
-  final int? userVote; // 1 = upvoted, -1 = downvoted, null = no vote
+  final int? userVote;
+  final List<ForumMedia> media;
 
   const ForumPost({
     required this.id,
@@ -51,6 +72,7 @@ class ForumPost {
     required this.commentCount,
     required this.createdAt,
     this.userVote,
+    this.media = const [],
   });
 
   factory ForumPost.fromJson(Map<String, dynamic> json) {
@@ -69,6 +91,10 @@ class ForumPost {
       commentCount: json['comment_count'] as int? ?? 0,
       createdAt: DateTime.parse(json['created_at'] as String),
       userVote: json['user_vote'] as int?,
+      media: (json['media'] as List?)
+              ?.map((e) => ForumMedia.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
     );
   }
 
@@ -85,6 +111,7 @@ class ForumPost {
       commentCount: commentCount,
       createdAt: createdAt,
       userVote: userVote,
+      media: media,
     );
   }
 }
@@ -243,44 +270,49 @@ class ForumScreen extends ConsumerWidget {
     final postsAsync = ref.watch(_forumPostsProvider);
     final locale = ref.watch(localeProvider);
     final isTr = locale.languageCode == 'tr';
+    final buildingId = ref.watch(selectedBuildingIdProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Forum'),
       ),
-      body: Column(
-        children: [
-          // Category chips
-          const _CategoryChipBar(),
-          const Divider(height: 1),
-          // Posts
-          Expanded(
-            child: postsAsync.when(
-              loading: () => const _ShimmerPostList(),
-              error: (error, _) => _ErrorState(
-                message: error.toString(),
-                onRetry: () => ref.read(_forumPostsProvider.notifier).fetch(),
-              ),
-              data: (posts) {
-                if (posts.isEmpty) return const _EmptyState();
-                return RefreshIndicator(
-                  color: AppColors.primary,
-                  onRefresh: () =>
-                      ref.read(_forumPostsProvider.notifier).fetch(),
-                  child: _PostList(posts: posts),
-                );
-              },
+      body: buildingId == null
+          ? _NoBuildingForumState(isTr: isTr)
+          : Column(
+              children: [
+                // Category chips
+                const _CategoryChipBar(),
+                const Divider(height: 1),
+                // Posts
+                Expanded(
+                  child: postsAsync.when(
+                    loading: () => const _ShimmerPostList(),
+                    error: (error, _) => _ErrorState(
+                      message: error.toString(),
+                      onRetry: () => ref.read(_forumPostsProvider.notifier).fetch(),
+                    ),
+                    data: (posts) {
+                      if (posts.isEmpty) return const _EmptyState();
+                      return RefreshIndicator(
+                        color: AppColors.primary,
+                        onRefresh: () =>
+                            ref.read(_forumPostsProvider.notifier).fetch(),
+                        child: _PostList(posts: posts),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'forum_fab',
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        onPressed: () => _showCreatePostSheet(context),
-        child: const Icon(Icons.edit_rounded),
-      ),
+      floatingActionButton: buildingId != null
+          ? FloatingActionButton(
+              heroTag: 'forum_fab',
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              onPressed: () => _showCreatePostSheet(context),
+              child: const Icon(Icons.edit_rounded),
+            )
+          : null,
     );
   }
 
@@ -536,6 +568,56 @@ class _ForumPostCard extends ConsumerWidget {
                 ),
               ],
 
+              // Media images
+              if (post.media.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: post.media.length == 1
+                      ? Image.network(
+                          post.media.first.url,
+                          width: double.infinity,
+                          height: 200,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            height: 200,
+                            color: Colors.grey.shade200,
+                            child: const Center(
+                              child: Icon(Icons.broken_image_rounded,
+                                  color: AppColors.textHint, size: 40),
+                            ),
+                          ),
+                        )
+                      : SizedBox(
+                          height: 160,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: post.media.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(width: 8),
+                            itemBuilder: (context, i) => ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Image.network(
+                                post.media[i].url,
+                                width: 200,
+                                height: 160,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  width: 200,
+                                  height: 160,
+                                  color: Colors.grey.shade200,
+                                  child: const Center(
+                                    child: Icon(Icons.broken_image_rounded,
+                                        color: AppColors.textHint),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                ),
+              ],
+
               const SizedBox(height: 14),
 
               // Bottom actions row
@@ -667,6 +749,7 @@ class _CreatePostSheet extends ConsumerStatefulWidget {
 class _CreatePostSheetState extends ConsumerState<_CreatePostSheet> {
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
+  final List<XFile> _selectedImages = [];
   bool _isSubmitting = false;
 
   @override
@@ -674,6 +757,14 @@ class _CreatePostSheetState extends ConsumerState<_CreatePostSheet> {
     _titleController.dispose();
     _bodyController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImages() async {
+    final picker = ImagePicker();
+    final images = await picker.pickMultiImage(imageQuality: 80, maxWidth: 1920);
+    if (images.isNotEmpty) {
+      setState(() => _selectedImages.addAll(images));
+    }
   }
 
   Future<void> _submit() async {
@@ -704,12 +795,24 @@ class _CreatePostSheetState extends ConsumerState<_CreatePostSheet> {
     setState(() => _isSubmitting = true);
     try {
       final api = ref.read(apiClientProvider);
-      await api.createForumPost(buildingId, {
+      final response = await api.createForumPost(buildingId, {
         'title': title,
         'body': body,
         if (ref.read(_selectedCategoryProvider) != null)
           'category_id': ref.read(_selectedCategoryProvider),
       });
+
+      // Upload images if any
+      final postData = response.data['data'];
+      final postId = postData is Map ? postData['id'] as String? : null;
+      if (postId != null && _selectedImages.isNotEmpty) {
+        for (final img in _selectedImages) {
+          final file = await MultipartFile.fromFile(img.path,
+              filename: img.name);
+          await api.uploadForumMedia(buildingId, postId, file);
+        }
+      }
+
       if (mounted) Navigator.of(context).pop();
       ref.read(_forumPostsProvider.notifier).fetch();
     } catch (e) {
@@ -780,6 +883,76 @@ class _CreatePostSheetState extends ConsumerState<_CreatePostSheet> {
             ),
             enabled: !_isSubmitting,
           ),
+          const SizedBox(height: 14),
+          // Image picker
+          Row(
+            children: [
+              OutlinedButton.icon(
+                onPressed: _isSubmitting ? null : _pickImages,
+                icon: const Icon(Icons.image_rounded, size: 18),
+                label: Text(ref.watch(localeProvider).languageCode == 'tr'
+                    ? 'Görsel Ekle'
+                    : 'Add Images'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: const BorderSide(color: AppColors.primary),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              if (_selectedImages.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Text(
+                  '${_selectedImages.length} selected',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          if (_selectedImages.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 80,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _selectedImages.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, i) => Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.file(
+                        File(_selectedImages[i].path),
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    Positioned(
+                      top: 2,
+                      right: 2,
+                      child: GestureDetector(
+                        onTap: () =>
+                            setState(() => _selectedImages.removeAt(i)),
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            color: Colors.black54,
+                            shape: BoxShape.circle,
+                          ),
+                          padding: const EdgeInsets.all(2),
+                          child: const Icon(Icons.close,
+                              size: 14, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           FilledButton(
             onPressed: _isSubmitting ? null : _submit,
@@ -808,6 +981,60 @@ class _CreatePostSheetState extends ConsumerState<_CreatePostSheet> {
                   ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// No building state
+// ---------------------------------------------------------------------------
+
+class _NoBuildingForumState extends StatelessWidget {
+  final bool isTr;
+  const _NoBuildingForumState({required this.isTr});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 88,
+              height: 88,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.apartment_rounded,
+                size: 44,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              isTr ? 'Henüz bir binaya üye değilsiniz' : 'No building selected',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isTr
+                  ? 'Forum kullanmak için bir binaya üye olmanız gerekiyor.'
+                  : 'You need to be a member of a building to use the forum.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }

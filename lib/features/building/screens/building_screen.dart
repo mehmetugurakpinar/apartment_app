@@ -915,6 +915,34 @@ class _DuesTile extends ConsumerWidget {
     );
   }
 
+  void _showEditSheet(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _EditDuesPlanSheet(
+        plan: plan,
+        onSuccess: () => onDeleted?.call(),
+      ),
+    );
+  }
+
+  void _showPaySheet(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _PayDuesSheet(
+        plan: plan,
+        onSuccess: () => onDeleted?.call(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
@@ -952,11 +980,42 @@ class _DuesTile extends ConsumerWidget {
                     padding: EdgeInsets.zero,
                     iconSize: 20,
                     onSelected: (value) {
-                      if (value == 'delete') {
-                        _deletePlan(context, ref);
+                      switch (value) {
+                        case 'edit':
+                          _showEditSheet(context, ref);
+                          break;
+                        case 'pay':
+                          _showPaySheet(context, ref);
+                          break;
+                        case 'delete':
+                          _deletePlan(context, ref);
+                          break;
                       }
                     },
                     itemBuilder: (_) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_outlined,
+                                color: AppColors.primary, size: 20),
+                            SizedBox(width: 8),
+                            Text('Edit'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'pay',
+                        child: Row(
+                          children: [
+                            Icon(Icons.payment_outlined,
+                                color: AppColors.success, size: 20),
+                            SizedBox(width: 8),
+                            Text('Record Payment',
+                                style: TextStyle(color: AppColors.success)),
+                          ],
+                        ),
+                      ),
                       const PopupMenuItem(
                         value: 'delete',
                         child: Row(
@@ -1035,6 +1094,9 @@ class _MaintenanceTab extends ConsumerWidget {
 
   Color _statusColor(String? status) {
     switch (status?.toLowerCase()) {
+      case 'pending_approval':
+      case 'pending approval':
+        return AppColors.accent;
       case 'open':
         return AppColors.info;
       case 'in_progress':
@@ -1048,6 +1110,70 @@ class _MaintenanceTab extends ConsumerWidget {
       default:
         return AppColors.textSecondary;
     }
+  }
+
+  void _approveRequest(BuildContext context, WidgetRef ref, String reqId) async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final buildingId = ref.read(selectedBuildingIdProvider)!;
+      await api.approveMaintenanceRequest(buildingId, reqId);
+      ref.invalidate(_maintenanceProvider);
+      if (context.mounted) {
+        final isTr = ref.read(localeProvider).languageCode == 'tr';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(isTr ? 'Talep onaylandı' : 'Request approved')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  void _rejectRequest(BuildContext context, WidgetRef ref, String reqId) async {
+    final isTr = ref.read(localeProvider).languageCode == 'tr';
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isTr ? 'Talebi Reddet' : 'Reject Request'),
+        content: Text(isTr
+            ? 'Bu bakım talebini reddetmek istediğinizden emin misiniz?'
+            : 'Are you sure you want to reject this maintenance request?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(isTr ? 'İptal' : 'Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                final api = ref.read(apiClientProvider);
+                final buildingId = ref.read(selectedBuildingIdProvider)!;
+                await api.rejectMaintenanceRequest(buildingId, reqId);
+                ref.invalidate(_maintenanceProvider);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(isTr ? 'Talep reddedildi' : 'Request rejected')),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e')),
+                  );
+                }
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: Text(isTr ? 'Reddet' : 'Reject'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _deleteRequest(BuildContext context, WidgetRef ref, String reqId) {
@@ -1086,6 +1212,33 @@ class _MaintenanceTab extends ConsumerWidget {
             child: const Text('Delete'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showChangeStatusSheet(BuildContext context, WidgetRef ref, Map<String, dynamic> req) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _ChangeStatusSheet(
+        request: req,
+        onSuccess: () => ref.invalidate(_maintenanceProvider),
+      ),
+    );
+  }
+
+  void _showEditMaintenanceSheet(BuildContext context, WidgetRef ref, Map<String, dynamic> req) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _EditMaintenanceSheet(
+        request: req,
+        onSuccess: () => ref.invalidate(_maintenanceProvider),
       ),
     );
   }
@@ -1151,11 +1304,75 @@ class _MaintenanceTab extends ConsumerWidget {
                               padding: EdgeInsets.zero,
                               iconSize: 20,
                               onSelected: (value) {
-                                if (value == 'delete') {
-                                  _deleteRequest(context, ref, req['id'] as String);
+                                final reqId = req['id'] as String;
+                                switch (value) {
+                                  case 'approve':
+                                    _approveRequest(context, ref, reqId);
+                                    break;
+                                  case 'reject':
+                                    _rejectRequest(context, ref, reqId);
+                                    break;
+                                  case 'status':
+                                    _showChangeStatusSheet(context, ref, req);
+                                    break;
+                                  case 'edit':
+                                    _showEditMaintenanceSheet(context, ref, req);
+                                    break;
+                                  case 'delete':
+                                    _deleteRequest(context, ref, reqId);
+                                    break;
                                 }
                               },
                               itemBuilder: (_) => [
+                                if (status == 'pending_approval') ...[
+                                  const PopupMenuItem(
+                                    value: 'approve',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.check_circle_outline,
+                                            color: AppColors.success, size: 20),
+                                        SizedBox(width: 8),
+                                        Text('Approve',
+                                            style: TextStyle(color: AppColors.success)),
+                                      ],
+                                    ),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'reject',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.cancel_outlined,
+                                            color: AppColors.error, size: 20),
+                                        SizedBox(width: 8),
+                                        Text('Reject',
+                                            style: TextStyle(color: AppColors.error)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                if (status != 'pending_approval')
+                                  const PopupMenuItem(
+                                    value: 'status',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.swap_horiz,
+                                            color: AppColors.info, size: 20),
+                                        SizedBox(width: 8),
+                                        Text('Change Status'),
+                                      ],
+                                    ),
+                                  ),
+                                const PopupMenuItem(
+                                  value: 'edit',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.edit_outlined,
+                                          color: AppColors.primary, size: 20),
+                                      SizedBox(width: 8),
+                                      Text('Edit'),
+                                    ],
+                                  ),
+                                ),
                                 const PopupMenuItem(
                                   value: 'delete',
                                   child: Row(
@@ -1193,9 +1410,9 @@ class _MaintenanceTab extends ConsumerWidget {
                             theme: theme,
                           ),
                           const Spacer(),
-                          if (req['unit_number'] != null)
+                          if (req['created_by_name'] != null)
                             Text(
-                              'Unit ${req['unit_number']}',
+                              req['created_by_name'] as String,
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: AppColors.textSecondary,
                               ),
@@ -1214,6 +1431,43 @@ class _MaintenanceTab extends ConsumerWidget {
                           ],
                         ],
                       ),
+                      // Approve/Reject buttons for managers on pending requests
+                      if (isManager && status == 'pending_approval') ...[
+                        const SizedBox(height: 10),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: () =>
+                                  _rejectRequest(context, ref, req['id'] as String),
+                              icon: const Icon(Icons.close, size: 16),
+                              label: Text(ref.read(localeProvider).languageCode == 'tr'
+                                  ? 'Reddet'
+                                  : 'Reject'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.error,
+                                side: const BorderSide(color: AppColors.error),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            FilledButton.icon(
+                              onPressed: () =>
+                                  _approveRequest(context, ref, req['id'] as String),
+                              icon: const Icon(Icons.check, size: 16),
+                              label: Text(ref.read(localeProvider).languageCode == 'tr'
+                                  ? 'Onayla'
+                                  : 'Approve'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppColors.success,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -2853,25 +3107,44 @@ class _InviteUserSheetState extends ConsumerState<_InviteUserSheet> {
     if (email.isEmpty) return;
     final buildingId = ref.read(selectedBuildingIdProvider);
     if (buildingId == null) return;
+    final isTr = ref.read(localeProvider).languageCode == 'tr';
 
     setState(() => _loading = true);
     try {
       final api = ref.read(apiClientProvider);
-      await api.inviteUser(buildingId, {
+      final response = await api.inviteUser(buildingId, {
         'email': email,
         'role': _selectedRole,
       });
-      _emailCtrl.clear();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invitation sent successfully')),
-        );
+      if (response.data['success'] == true) {
+        _emailCtrl.clear();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(isTr ? 'Davet gönderildi' : 'Invitation sent successfully')),
+          );
+        }
+        _loadInvitations();
+      } else {
+        final error = response.data['error'] ?? 'Unknown error';
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(error.toString().contains('already has a manager')
+                  ? (isTr ? 'Bu binanın zaten bir yöneticisi var.' : error.toString())
+                  : error.toString()),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
       }
-      _loadInvitations();
     } catch (e) {
       if (mounted) {
+        String msg = e.toString();
+        if (msg.contains('already has a manager')) {
+          msg = isTr ? 'Bu binanın zaten bir yöneticisi var. Bir binanın yalnızca 1 yöneticisi olabilir.' : 'This building already has a manager.';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text(msg), backgroundColor: AppColors.error),
         );
       }
     } finally {
@@ -3038,6 +3311,770 @@ class _InviteUserSheetState extends ConsumerState<_InviteUserSheet> {
               ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+// ===========================================================================
+// Change Maintenance Status Bottom Sheet
+// ===========================================================================
+
+class _ChangeStatusSheet extends ConsumerStatefulWidget {
+  final Map<String, dynamic> request;
+  final VoidCallback onSuccess;
+
+  const _ChangeStatusSheet({required this.request, required this.onSuccess});
+
+  @override
+  ConsumerState<_ChangeStatusSheet> createState() => _ChangeStatusSheetState();
+}
+
+class _ChangeStatusSheetState extends ConsumerState<_ChangeStatusSheet> {
+  late String _selectedStatus;
+  bool _submitting = false;
+
+  static const _statuses = ['open', 'in_progress', 'resolved', 'closed'];
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedStatus = widget.request['status'] as String? ?? 'open';
+  }
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'open':
+        return AppColors.info;
+      case 'in_progress':
+        return AppColors.warning;
+      case 'resolved':
+        return AppColors.success;
+      case 'closed':
+        return AppColors.textSecondary;
+      default:
+        return AppColors.textSecondary;
+    }
+  }
+
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'open':
+        return 'Open';
+      case 'in_progress':
+        return 'In Progress';
+      case 'resolved':
+        return 'Resolved';
+      case 'closed':
+        return 'Closed';
+      default:
+        return status;
+    }
+  }
+
+  Future<void> _submit() async {
+    if (_selectedStatus == (widget.request['status'] as String? ?? 'open')) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    setState(() => _submitting = true);
+    try {
+      final api = ref.read(apiClientProvider);
+      final buildingId = ref.read(selectedBuildingIdProvider)!;
+      final reqId = widget.request['id'] as String;
+
+      await api.updateMaintenanceRequest(buildingId, reqId, {
+        'status': _selectedStatus,
+      });
+
+      if (mounted) Navigator.of(context).pop();
+      widget.onSuccess();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _SheetHeader(
+            icon: Icons.swap_horiz,
+            title: 'Change Status',
+          ),
+          Text(
+            widget.request['title'] as String? ?? '',
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ...(_statuses.map((status) {
+            final isSelected = _selectedStatus == status;
+            final color = _statusColor(status);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: InkWell(
+                onTap: _submitting ? null : () => setState(() => _selectedStatus = status),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: isSelected ? color : Colors.grey.shade300,
+                      width: isSelected ? 2 : 1,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    color: isSelected ? color.withValues(alpha: 0.08) : null,
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _statusLabel(status),
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                            color: isSelected ? color : null,
+                          ),
+                        ),
+                      ),
+                      if (isSelected)
+                        Icon(Icons.check_circle, color: color, size: 22),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          })),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: _submitting ? null : _submit,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: _submitting
+                ? const SizedBox(
+                    height: 20, width: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : const Text('Update Status', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ===========================================================================
+// Edit Maintenance Request Bottom Sheet
+// ===========================================================================
+
+class _EditMaintenanceSheet extends ConsumerStatefulWidget {
+  final Map<String, dynamic> request;
+  final VoidCallback onSuccess;
+
+  const _EditMaintenanceSheet({required this.request, required this.onSuccess});
+
+  @override
+  ConsumerState<_EditMaintenanceSheet> createState() => _EditMaintenanceSheetState();
+}
+
+class _EditMaintenanceSheetState extends ConsumerState<_EditMaintenanceSheet> {
+  late final TextEditingController _titleController;
+  late final TextEditingController _descriptionController;
+  late String _selectedPriority;
+  bool _submitting = false;
+
+  static const _priorities = ['low', 'normal', 'high', 'emergency'];
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.request['title'] as String? ?? '');
+    _descriptionController = TextEditingController(text: widget.request['description'] as String? ?? '');
+    _selectedPriority = widget.request['priority'] as String? ?? 'normal';
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  Color _priorityColor(String priority) {
+    switch (priority) {
+      case 'emergency':
+        return AppColors.emergency;
+      case 'high':
+        return AppColors.high;
+      case 'normal':
+        return AppColors.normal;
+      case 'low':
+        return AppColors.low;
+      default:
+        return AppColors.textSecondary;
+    }
+  }
+
+  Future<void> _submit() async {
+    final title = _titleController.text.trim();
+    if (title.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Title is required.'), backgroundColor: AppColors.error),
+      );
+      return;
+    }
+
+    setState(() => _submitting = true);
+    try {
+      final api = ref.read(apiClientProvider);
+      final buildingId = ref.read(selectedBuildingIdProvider)!;
+      final reqId = widget.request['id'] as String;
+      final description = _descriptionController.text.trim();
+
+      await api.updateMaintenanceRequest(buildingId, reqId, {
+        'title': title,
+        if (description.isNotEmpty) 'description': description,
+        'priority': _selectedPriority,
+      });
+
+      if (mounted) Navigator.of(context).pop();
+      widget.onSuccess();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + bottomInset),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const _SheetHeader(
+              icon: Icons.edit_outlined,
+              title: 'Edit Request',
+            ),
+            TextField(
+              controller: _titleController,
+              decoration: const InputDecoration(
+                labelText: 'Title *',
+                hintText: 'e.g. Leaking pipe in basement',
+              ),
+              textCapitalization: TextCapitalization.sentences,
+              textInputAction: TextInputAction.next,
+              enabled: !_submitting,
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _descriptionController,
+              decoration: const InputDecoration(
+                labelText: 'Description',
+                hintText: 'Describe the issue in detail...',
+                alignLabelWithHint: true,
+              ),
+              textCapitalization: TextCapitalization.sentences,
+              maxLines: 3,
+              enabled: !_submitting,
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Priority',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: _priorities.map((priority) {
+                final isSelected = _selectedPriority == priority;
+                final color = _priorityColor(priority);
+                return ChoiceChip(
+                  label: Text(priority[0].toUpperCase() + priority.substring(1)),
+                  selected: isSelected,
+                  onSelected: _submitting
+                      ? null
+                      : (_) => setState(() => _selectedPriority = priority),
+                  selectedColor: color.withValues(alpha: 0.2),
+                  labelStyle: TextStyle(
+                    color: isSelected ? color : AppColors.textSecondary,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                  side: BorderSide(
+                    color: isSelected ? color : Colors.grey.shade300,
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 20),
+            FilledButton(
+              onPressed: _submitting ? null : _submit,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: _submitting
+                  ? const SizedBox(
+                      height: 20, width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Save Changes', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ===========================================================================
+// Edit Dues Plan Bottom Sheet
+// ===========================================================================
+
+class _EditDuesPlanSheet extends ConsumerStatefulWidget {
+  final Map<String, dynamic> plan;
+  final VoidCallback onSuccess;
+
+  const _EditDuesPlanSheet({required this.plan, required this.onSuccess});
+
+  @override
+  ConsumerState<_EditDuesPlanSheet> createState() => _EditDuesPlanSheetState();
+}
+
+class _EditDuesPlanSheetState extends ConsumerState<_EditDuesPlanSheet> {
+  late final TextEditingController _titleController;
+  late final TextEditingController _amountController;
+  late final TextEditingController _periodMonthController;
+  late final TextEditingController _periodYearController;
+  late final TextEditingController _dueDateController;
+  bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.plan['title'] as String? ?? '');
+    _amountController = TextEditingController(text: '${widget.plan['amount'] ?? ''}');
+    _periodMonthController = TextEditingController(text: '${widget.plan['period_month'] ?? ''}');
+    _periodYearController = TextEditingController(text: '${widget.plan['period_year'] ?? ''}');
+
+    // Parse due_date - handle both timestamp and date format
+    String dueDate = '';
+    final rawDate = widget.plan['due_date'];
+    if (rawDate != null) {
+      try {
+        final dt = DateTime.parse(rawDate.toString());
+        dueDate = '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+      } catch (_) {
+        dueDate = rawDate.toString();
+      }
+    }
+    _dueDateController = TextEditingController(text: dueDate);
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _amountController.dispose();
+    _periodMonthController.dispose();
+    _periodYearController.dispose();
+    _dueDateController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDueDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(now.year + 2),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(primary: AppColors.primary),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      _dueDateController.text =
+          '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+    }
+  }
+
+  Future<void> _submit() async {
+    final title = _titleController.text.trim();
+    final amount = double.tryParse(_amountController.text.trim());
+    final periodMonth = int.tryParse(_periodMonthController.text.trim());
+    final periodYear = int.tryParse(_periodYearController.text.trim());
+    final dueDate = _dueDateController.text.trim();
+
+    if (title.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Title is required.'), backgroundColor: AppColors.error),
+      );
+      return;
+    }
+
+    if (amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Amount must be greater than 0.'), backgroundColor: AppColors.error),
+      );
+      return;
+    }
+
+    setState(() => _submitting = true);
+    try {
+      final api = ref.read(apiClientProvider);
+      final buildingId = ref.read(selectedBuildingIdProvider)!;
+      final planId = widget.plan['id'] as String;
+
+      final data = <String, dynamic>{
+        'title': title,
+        'amount': amount,
+      };
+      if (periodMonth != null) data['period_month'] = periodMonth;
+      if (periodYear != null) data['period_year'] = periodYear;
+      if (dueDate.isNotEmpty) data['due_date'] = dueDate;
+
+      await api.updateDuesPlan(buildingId, planId, data);
+
+      if (mounted) Navigator.of(context).pop();
+      widget.onSuccess();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + bottomInset),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const _SheetHeader(
+              icon: Icons.edit_outlined,
+              title: 'Edit Dues Plan',
+            ),
+            TextField(
+              controller: _titleController,
+              decoration: const InputDecoration(
+                labelText: 'Title *',
+                hintText: 'e.g. March 2026 Maintenance Fee',
+              ),
+              textCapitalization: TextCapitalization.sentences,
+              textInputAction: TextInputAction.next,
+              enabled: !_submitting,
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _amountController,
+              decoration: const InputDecoration(
+                labelText: 'Amount *',
+                hintText: 'e.g. 250.00',
+                prefixText: '\$ ',
+              ),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              textInputAction: TextInputAction.next,
+              enabled: !_submitting,
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _periodMonthController,
+                    decoration: const InputDecoration(
+                      labelText: 'Period Month',
+                      hintText: '1-12',
+                    ),
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.next,
+                    enabled: !_submitting,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _periodYearController,
+                    decoration: const InputDecoration(
+                      labelText: 'Period Year',
+                      hintText: '2026',
+                    ),
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.next,
+                    enabled: !_submitting,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _dueDateController,
+              decoration: InputDecoration(
+                labelText: 'Due Date',
+                hintText: 'YYYY-MM-DD',
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.calendar_today_outlined, size: 20),
+                  onPressed: _submitting ? null : _pickDueDate,
+                ),
+              ),
+              readOnly: true,
+              onTap: _submitting ? null : _pickDueDate,
+              enabled: !_submitting,
+            ),
+            const SizedBox(height: 20),
+            FilledButton(
+              onPressed: _submitting ? null : _submit,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: _submitting
+                  ? const SizedBox(
+                      height: 20, width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Save Changes', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ===========================================================================
+// Pay Dues (Record Payment) Bottom Sheet
+// ===========================================================================
+
+class _PayDuesSheet extends ConsumerStatefulWidget {
+  final Map<String, dynamic> plan;
+  final VoidCallback onSuccess;
+
+  const _PayDuesSheet({required this.plan, required this.onSuccess});
+
+  @override
+  ConsumerState<_PayDuesSheet> createState() => _PayDuesSheetState();
+}
+
+class _PayDuesSheetState extends ConsumerState<_PayDuesSheet> {
+  final _amountController = TextEditingController();
+  final _notesController = TextEditingController();
+  String? _selectedUnitId;
+  bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _amountController.text = '${widget.plan['amount'] ?? ''}';
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_selectedUnitId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a unit.'), backgroundColor: AppColors.error),
+      );
+      return;
+    }
+
+    final amount = double.tryParse(_amountController.text.trim());
+    if (amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Amount must be greater than 0.'), backgroundColor: AppColors.error),
+      );
+      return;
+    }
+
+    setState(() => _submitting = true);
+    try {
+      final api = ref.read(apiClientProvider);
+      final buildingId = ref.read(selectedBuildingIdProvider)!;
+      final planId = widget.plan['id'] as String;
+      final notes = _notesController.text.trim();
+
+      await api.payDues(buildingId, planId, {
+        'unit_id': _selectedUnitId,
+        'paid_amount': amount,
+        if (notes.isNotEmpty) 'notes': notes,
+      });
+
+      if (mounted) Navigator.of(context).pop();
+      widget.onSuccess();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Payment recorded'), backgroundColor: AppColors.success),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final unitsAsync = ref.watch(_unitsProvider);
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + bottomInset),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const _SheetHeader(
+              icon: Icons.payment_outlined,
+              title: 'Record Payment',
+            ),
+            Text(
+              widget.plan['title'] as String? ?? 'Dues',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Unit selector
+            unitsAsync.when(
+              data: (units) {
+                if (units.isEmpty) {
+                  return const Text('No units available.');
+                }
+                return DropdownButtonFormField<String>(
+                  value: _selectedUnitId,
+                  decoration: const InputDecoration(
+                    labelText: 'Unit *',
+                    prefixIcon: Icon(Icons.door_front_door_outlined),
+                    border: OutlineInputBorder(),
+                  ),
+                  items: units.map((unit) {
+                    final unitId = unit['id'] as String;
+                    final unitNumber = unit['unit_number']?.toString() ?? '';
+                    final block = unit['block'] as String?;
+                    final floor = unit['floor'];
+                    final label = 'Unit $unitNumber${block != null ? ' (Block $block)' : ''}${floor != null ? ' - Floor $floor' : ''}';
+                    return DropdownMenuItem(value: unitId, child: Text(label));
+                  }).toList(),
+                  onChanged: _submitting ? null : (v) => setState(() => _selectedUnitId = v),
+                );
+              },
+              loading: () => const LinearProgressIndicator(),
+              error: (e, _) => Text('Failed to load units: $e'),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _amountController,
+              decoration: const InputDecoration(
+                labelText: 'Amount *',
+                hintText: 'e.g. 250.00',
+                prefixText: '\$ ',
+              ),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              textInputAction: TextInputAction.next,
+              enabled: !_submitting,
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _notesController,
+              decoration: const InputDecoration(
+                labelText: 'Notes (optional)',
+                hintText: 'e.g. Paid via bank transfer',
+              ),
+              textCapitalization: TextCapitalization.sentences,
+              textInputAction: TextInputAction.done,
+              enabled: !_submitting,
+            ),
+            const SizedBox(height: 20),
+            FilledButton(
+              onPressed: _submitting ? null : _submit,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.success,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: _submitting
+                  ? const SizedBox(
+                      height: 20, width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Record Payment', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -12,6 +12,11 @@ import '../../features/notifications/screens/notifications_screen.dart';
 import '../../features/forum/screens/forum_screen.dart';
 import '../../features/timeline/screens/timeline_screen.dart';
 import '../../features/timeline/screens/user_search_screen.dart';
+import '../../features/timeline/screens/timeline_post_detail_screen.dart';
+import '../../features/messaging/screens/conversations_screen.dart';
+import '../../features/messaging/screens/chat_screen.dart';
+import '../../features/social/screens/user_profile_screen.dart';
+import '../../features/social/screens/followers_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 
 /// Bridges Riverpod [authStateProvider] changes into a [ChangeNotifier]
@@ -90,6 +95,50 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/user-search',
         builder: (context, state) => const UserSearchScreen(),
+      ),
+      GoRoute(
+        path: '/timeline/:postId',
+        builder: (context, state) => TimelinePostDetailScreen(
+          postId: state.pathParameters['postId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/messages',
+        builder: (context, state) => const ConversationsScreen(),
+      ),
+      GoRoute(
+        path: '/messages/:convId',
+        builder: (context, state) {
+          final extra = state.extra;
+          String? otherUserName;
+          if (extra is ConversationItem) {
+            otherUserName = extra.displayName;
+          }
+          return ChatScreen(
+            conversationId: state.pathParameters['convId']!,
+            otherUserName: otherUserName,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/users/:id',
+        builder: (context, state) => UserProfileScreen(
+          userId: state.pathParameters['id']!,
+        ),
+      ),
+      GoRoute(
+        path: '/users/:id/followers',
+        builder: (context, state) => FollowersScreen(
+          userId: state.pathParameters['id']!,
+          isFollowing: false,
+        ),
+      ),
+      GoRoute(
+        path: '/users/:id/following',
+        builder: (context, state) => FollowersScreen(
+          userId: state.pathParameters['id']!,
+          isFollowing: true,
+        ),
       ),
     ],
   );

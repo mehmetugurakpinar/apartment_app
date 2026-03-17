@@ -332,16 +332,14 @@ class TimelineScreen extends ConsumerWidget {
         title: const Text('Community'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.chat_rounded),
+            tooltip: 'Messages',
+            onPressed: () => context.push('/messages'),
+          ),
+          IconButton(
             icon: const Icon(Icons.search_rounded),
             tooltip: 'Search users',
             onPressed: () => context.push('/user-search'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.map_outlined),
-            tooltip: 'Nearby map',
-            onPressed: () {
-              // Navigate to map view
-            },
           ),
         ],
       ),
@@ -710,7 +708,7 @@ class _TimelinePostCard extends ConsumerWidget {
                     label: 'Comment',
                     isActive: false,
                     onPressed: () {
-                      // Navigate to comments
+                      context.push('/timeline/${post.id}');
                     },
                   ),
                 ),

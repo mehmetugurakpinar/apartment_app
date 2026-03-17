@@ -81,19 +81,90 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
     final dashboardAsync = ref.watch(_dashboardProvider);
+    final buildingsAsync = ref.watch(userBuildingsProvider);
     final theme = Theme.of(context);
+    final isTr = ref.watch(localeProvider).languageCode == 'tr';
+
+    // Check if user has no buildings
+    final hasNoBuildings = buildingsAsync.valueOrNull?.isEmpty ?? false;
 
     return Scaffold(
       appBar: _buildAppBar(theme, authState),
-      body: RefreshIndicator(
-        color: AppColors.primary,
-        onRefresh: _onRefresh,
-        child: dashboardAsync.when(
-          data: (data) => _buildContent(theme, authState, data),
-          loading: () => _buildShimmerContent(theme),
-          error: (error, _) => _buildErrorState(theme, error),
+      body: hasNoBuildings
+          ? _buildNoBuildingsState(theme, authState, isTr)
+          : RefreshIndicator(
+              color: AppColors.primary,
+              onRefresh: _onRefresh,
+              child: dashboardAsync.when(
+                data: (data) => _buildContent(theme, authState, data),
+                loading: () => _buildShimmerContent(theme),
+                error: (error, _) => _buildErrorState(theme, error),
+              ),
+            ),
+    );
+  }
+
+  Widget _buildNoBuildingsState(ThemeData theme, AuthState authState, bool isTr) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      children: [
+        _WelcomeCard(
+          greeting: _greeting(),
+          userName: _userName(authState.user),
         ),
-      ),
+        const SizedBox(height: 40),
+        Center(
+          child: Column(
+            children: [
+              Container(
+                width: 88,
+                height: 88,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.apartment_rounded,
+                  size: 44,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                isTr ? 'Henüz bir binaya üye değilsiniz' : 'You are not a member of any building yet',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                isTr
+                    ? 'Bir bina oluşturun veya yöneticinizden davet bekleyin.'
+                    : 'Create a building or wait for an invitation from your manager.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: () => context.go('/building'),
+                icon: const Icon(Icons.add_business_outlined),
+                label: Text(isTr ? 'Bina Ekle' : 'Add Building'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

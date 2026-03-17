@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/providers/providers.dart';
 import '../../../core/theme/app_theme.dart';
@@ -254,6 +255,7 @@ class _UserSearchTile extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return ListTile(
+      onTap: () => context.push('/users/${user.id}'),
       contentPadding: const EdgeInsets.symmetric(vertical: 8),
       leading: CircleAvatar(
         radius: 24,

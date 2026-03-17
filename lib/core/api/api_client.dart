@@ -180,6 +180,12 @@ class ApiClient {
   Future<Response> deleteMaintenanceRequest(String buildingId, String reqId) =>
       _dio.delete('/buildings/$buildingId/maintenance/$reqId');
 
+  Future<Response> approveMaintenanceRequest(String buildingId, String reqId) =>
+      _dio.post('/buildings/$buildingId/maintenance/$reqId/approve');
+
+  Future<Response> rejectMaintenanceRequest(String buildingId, String reqId) =>
+      _dio.post('/buildings/$buildingId/maintenance/$reqId/reject');
+
   // Notifications
   Future<Response> getNotifications({int page = 1, int limit = 20}) =>
       _dio.get('/notifications',
@@ -228,6 +234,13 @@ class ApiClient {
       _dio.post('/buildings/$buildingId/forum/posts/$postId/vote',
           data: {'value': value});
 
+  Future<Response> uploadForumMedia(
+      String buildingId, String postId, MultipartFile file) {
+    final formData = FormData.fromMap({'file': file});
+    return _dio.post('/buildings/$buildingId/forum/posts/$postId/media',
+        data: formData);
+  }
+
   // Timeline
   Future<Response> getTimelineFeed({int page = 1, int limit = 20}) =>
       _dio.get('/timeline',
@@ -252,7 +265,19 @@ class ApiClient {
       _dio.get('/timeline/nearby',
           queryParameters: {'lat': lat, 'lng': lng, 'radius': radius});
 
+  // Timeline detail + comments
+  Future<Response> getTimelinePost(String postId) =>
+      _dio.get('/timeline/$postId');
+
+  Future<Response> getTimelineComments(String postId,
+          {int page = 1, int limit = 50}) =>
+      _dio.get('/timeline/$postId/comments',
+          queryParameters: {'page': page, 'limit': limit});
+
   // Social / Follow
+  Future<Response> getUserProfile(String userId) =>
+      _dio.get('/users/$userId/profile');
+
   Future<Response> searchUsers(String query) =>
       _dio.get('/users/search', queryParameters: {'q': query});
 
@@ -278,6 +303,28 @@ class ApiClient {
 
   Future<Response> unrepostPost(String postId) =>
       _dio.delete('/timeline/$postId/repost');
+
+  // Messaging
+  Future<Response> getConversations({int page = 1, int limit = 20}) =>
+      _dio.get('/messages/conversations',
+          queryParameters: {'page': page, 'limit': limit});
+
+  Future<Response> startConversation(String userId) =>
+      _dio.post('/messages/conversations', data: {'user_id': userId});
+
+  Future<Response> getMessages(String convId,
+          {String? before, int limit = 50}) =>
+      _dio.get('/messages/conversations/$convId/messages', queryParameters: {
+        'limit': limit,
+        if (before != null) 'before': before,
+      });
+
+  Future<Response> sendMessage(
+          String convId, Map<String, dynamic> data) =>
+      _dio.post('/messages/conversations/$convId/messages', data: data);
+
+  Future<Response> markConversationRead(String convId) =>
+      _dio.post('/messages/conversations/$convId/read');
 
   // Invitations
   Future<Response> inviteUser(
