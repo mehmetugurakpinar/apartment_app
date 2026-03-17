@@ -18,6 +18,13 @@ import '../../features/messaging/screens/chat_screen.dart';
 import '../../features/social/screens/user_profile_screen.dart';
 import '../../features/social/screens/followers_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
+import '../../features/dues/screens/dues_screen.dart';
+import '../../features/maintenance/screens/maintenance_screen.dart';
+import '../../features/units/screens/units_screen.dart';
+import '../../features/visitors/screens/visitors_screen.dart';
+import '../../features/reservations/screens/reservations_screen.dart';
+import '../../features/packages/screens/packages_screen.dart';
+import '../../features/analytics/screens/analytics_screen.dart';
 
 /// Bridges Riverpod [authStateProvider] changes into a [ChangeNotifier]
 /// so GoRouter re-evaluates its redirect on login/logout.
@@ -139,6 +146,34 @@ final routerProvider = Provider<GoRouter>((ref) {
           userId: state.pathParameters['id']!,
           isFollowing: true,
         ),
+      ),
+      GoRoute(
+        path: '/dues',
+        builder: (context, state) => const DuesScreen(),
+      ),
+      GoRoute(
+        path: '/maintenance',
+        builder: (context, state) => const MaintenanceScreen(),
+      ),
+      GoRoute(
+        path: '/units',
+        builder: (context, state) => const UnitsScreen(),
+      ),
+      GoRoute(
+        path: '/visitors',
+        builder: (context, state) => const VisitorsScreen(),
+      ),
+      GoRoute(
+        path: '/reservations',
+        builder: (context, state) => const ReservationsScreen(),
+      ),
+      GoRoute(
+        path: '/packages',
+        builder: (context, state) => const PackagesScreen(),
+      ),
+      GoRoute(
+        path: '/analytics',
+        builder: (context, state) => const AnalyticsScreen(),
       ),
     ],
   );

@@ -343,4 +343,76 @@ class ApiClient {
   // Change password
   Future<Response> changePassword(Map<String, dynamic> data) =>
       _dio.patch('/auth/password', data: data);
+
+  // Visitors
+  Future<Response> getVisitors(String buildingId,
+          {String status = 'all', int page = 1, int limit = 20}) =>
+      _dio.get('/buildings/$buildingId/visitors',
+          queryParameters: {'status': status, 'page': page, 'limit': limit});
+
+  Future<Response> createVisitorPass(
+          String buildingId, Map<String, dynamic> data) =>
+      _dio.post('/buildings/$buildingId/visitors', data: data);
+
+  Future<Response> checkInVisitor(String buildingId, String passId) =>
+      _dio.post('/buildings/$buildingId/visitors/$passId/checkin');
+
+  Future<Response> checkOutVisitor(String buildingId, String passId) =>
+      _dio.post('/buildings/$buildingId/visitors/$passId/checkout');
+
+  Future<Response> cancelVisitorPass(String buildingId, String passId) =>
+      _dio.delete('/buildings/$buildingId/visitors/$passId');
+
+  // Common Areas & Reservations
+  Future<Response> getCommonAreas(String buildingId) =>
+      _dio.get('/buildings/$buildingId/areas');
+
+  Future<Response> createCommonArea(
+          String buildingId, Map<String, dynamic> data) =>
+      _dio.post('/buildings/$buildingId/areas', data: data);
+
+  Future<Response> getReservations(String buildingId,
+          {String? areaId, int page = 1, int limit = 20}) =>
+      _dio.get('/buildings/$buildingId/reservations', queryParameters: {
+        'page': page,
+        'limit': limit,
+        if (areaId != null) 'area_id': areaId,
+      });
+
+  Future<Response> createReservation(
+          String buildingId, Map<String, dynamic> data) =>
+      _dio.post('/buildings/$buildingId/reservations', data: data);
+
+  Future<Response> approveReservation(String buildingId, String resId) =>
+      _dio.post('/buildings/$buildingId/reservations/$resId/approve');
+
+  Future<Response> rejectReservation(String buildingId, String resId) =>
+      _dio.post('/buildings/$buildingId/reservations/$resId/reject');
+
+  Future<Response> cancelReservation(String buildingId, String resId) =>
+      _dio.delete('/buildings/$buildingId/reservations/$resId');
+
+  Future<Response> getMyReservations({int page = 1, int limit = 20}) =>
+      _dio.get('/reservations/my',
+          queryParameters: {'page': page, 'limit': limit});
+
+  // Packages
+  Future<Response> getPackages(String buildingId,
+          {String status = 'all', int page = 1, int limit = 20}) =>
+      _dio.get('/buildings/$buildingId/packages',
+          queryParameters: {'status': status, 'page': page, 'limit': limit});
+
+  Future<Response> createPackage(
+          String buildingId, Map<String, dynamic> data) =>
+      _dio.post('/buildings/$buildingId/packages', data: data);
+
+  Future<Response> pickUpPackage(String buildingId, String pkgId) =>
+      _dio.post('/buildings/$buildingId/packages/$pkgId/pickup');
+
+  Future<Response> notifyPackageRecipient(String buildingId, String pkgId) =>
+      _dio.post('/buildings/$buildingId/packages/$pkgId/notify');
+
+  Future<Response> getMyPackages({int page = 1, int limit = 20}) =>
+      _dio.get('/packages/my',
+          queryParameters: {'page': page, 'limit': limit});
 }

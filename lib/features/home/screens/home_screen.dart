@@ -192,6 +192,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       title: Text(ref.watch(localeProvider).languageCode == 'tr' ? 'Apartman Yöneticisi' : 'Apartment Manager'),
       actions: [
         IconButton(
+          icon: const Icon(Icons.bar_chart_rounded),
+          tooltip: 'Analytics',
+          onPressed: () => context.push('/analytics'),
+        ),
+        IconButton(
           icon: const Icon(Icons.settings_outlined),
           tooltip: 'Settings',
           onPressed: () => context.push('/profile'),
@@ -207,6 +212,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     AuthState authState,
     Map<String, dynamic> data,
   ) {
+    final isTr = ref.read(localeProvider).languageCode == 'tr';
     final recentActivity =
         (data['recent_activity'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
 
@@ -225,11 +231,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           openRequests: data['open_requests'] ?? 0,
         ),
         const SizedBox(height: 24),
-        const _SectionHeader(title: 'Quick Actions'),
+        _SectionHeader(title: isTr ? 'Hızlı İşlemler' : 'Quick Actions'),
         const SizedBox(height: 12),
-        _QuickActionsRow(onAction: _handleQuickAction),
+        _QuickActionsGrid(onAction: _handleQuickAction, isTr: isTr),
         const SizedBox(height: 24),
-        const _SectionHeader(title: 'Recent Activity'),
+        _SectionHeader(title: isTr ? 'Hizmetler' : 'Services'),
+        const SizedBox(height: 12),
+        _ServicesRow(onAction: _handleQuickAction, isTr: isTr),
+        const SizedBox(height: 24),
+        _SectionHeader(title: isTr ? 'Son Aktivite' : 'Recent Activity'),
         const SizedBox(height: 12),
         if (recentActivity.isEmpty)
           _EmptyActivityPlaceholder()
@@ -244,13 +254,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void _handleQuickAction(String action) {
     switch (action) {
       case 'pay_dues':
-        context.go('/building');
+        context.push('/dues');
         break;
       case 'maintenance':
-        context.go('/building');
+        context.push('/maintenance');
+        break;
+      case 'units':
+        context.push('/units');
+        break;
+      case 'messages':
+        context.push('/messages');
         break;
       case 'write_post':
         context.go('/forum');
+        break;
+      case 'announce':
+        context.go('/notifications');
+        break;
+      case 'visitors':
+        context.push('/visitors');
+        break;
+      case 'reservations':
+        context.push('/reservations');
+        break;
+      case 'packages':
+        context.push('/packages');
         break;
     }
   }
@@ -577,9 +605,85 @@ class _SectionHeader extends StatelessWidget {
 
 // ---------------------------------------------------------------------------
 
-class _QuickActionsRow extends StatelessWidget {
+class _QuickActionsGrid extends StatelessWidget {
   final void Function(String action) onAction;
-  const _QuickActionsRow({required this.onAction});
+  final bool isTr;
+  const _QuickActionsGrid({required this.onAction, required this.isTr});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _QuickActionButton(
+                icon: Icons.payments_outlined,
+                label: isTr ? 'Aidat Öde' : 'Pay Dues',
+                color: AppColors.accent,
+                onTap: () => onAction('pay_dues'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _QuickActionButton(
+                icon: Icons.build_outlined,
+                label: isTr ? 'Bakım' : 'Maintenance',
+                color: AppColors.primary,
+                onTap: () => onAction('maintenance'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _QuickActionButton(
+                icon: Icons.door_front_door_outlined,
+                label: isTr ? 'Daireler' : 'Units',
+                color: AppColors.info,
+                onTap: () => onAction('units'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _QuickActionButton(
+                icon: Icons.chat_outlined,
+                label: isTr ? 'Mesajlar' : 'Messages',
+                color: const Color(0xFF9C27B0),
+                onTap: () => onAction('messages'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _QuickActionButton(
+                icon: Icons.edit_note_outlined,
+                label: isTr ? 'Yazı Yaz' : 'Write Post',
+                color: AppColors.success,
+                onTap: () => onAction('write_post'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _QuickActionButton(
+                icon: Icons.campaign_outlined,
+                label: isTr ? 'Duyuru' : 'Announce',
+                color: AppColors.error,
+                onTap: () => onAction('announce'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ServicesRow extends StatelessWidget {
+  final void Function(String action) onAction;
+  final bool isTr;
+  const _ServicesRow({required this.onAction, required this.isTr});
 
   @override
   Widget build(BuildContext context) {
@@ -587,28 +691,28 @@ class _QuickActionsRow extends StatelessWidget {
       children: [
         Expanded(
           child: _QuickActionButton(
-            icon: Icons.payments_outlined,
-            label: 'Pay Dues',
-            color: AppColors.accent,
-            onTap: () => onAction('pay_dues'),
+            icon: Icons.people_alt_outlined,
+            label: isTr ? 'Ziyaretçiler' : 'Visitors',
+            color: const Color(0xFF00897B),
+            onTap: () => onAction('visitors'),
           ),
         ),
         const SizedBox(width: 10),
         Expanded(
           child: _QuickActionButton(
-            icon: Icons.build_outlined,
-            label: 'Maintenance',
-            color: AppColors.primary,
-            onTap: () => onAction('maintenance'),
+            icon: Icons.event_available_outlined,
+            label: isTr ? 'Rezervasyon' : 'Reservations',
+            color: const Color(0xFF5C6BC0),
+            onTap: () => onAction('reservations'),
           ),
         ),
         const SizedBox(width: 10),
         Expanded(
           child: _QuickActionButton(
-            icon: Icons.edit_note_outlined,
-            label: 'Write Post',
-            color: AppColors.info,
-            onTap: () => onAction('write_post'),
+            icon: Icons.inventory_2_outlined,
+            label: isTr ? 'Kargolar' : 'Packages',
+            color: const Color(0xFFEF6C00),
+            onTap: () => onAction('packages'),
           ),
         ),
       ],
